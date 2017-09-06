@@ -1,0 +1,59 @@
+; kb_scancodes.mac
+; define keyboard constants
+
+%define KB_LALT 		0
+%define KB_RALT 		1
+%define KB_LCTRL 		2
+%define KB_RCTRL 		3
+%define KB_LSHIFT 		4
+%define KB_RSHIFT 		5
+%define KB_F1 			6
+%define KB_F2 			7
+%define KB_F3			8
+%define KB_F4			9
+%define KB_F5			10
+%define KB_F6			11
+%define KB_F7			12
+%define KB_F8			13
+%define KB_F9			14
+%define KB_F10 			15
+%define KB_F11 			16
+%define KB_F12 			17
+%define KB_CAPSLK 		18
+%define KB_NUMLK 		19
+%define KB_SCRLK 		20
+%define KB_SYSRQ 		21
+%define KB_ESC			27
+%define KB_INSERT 		28
+%define KB_DEL 			29
+%define KB_HOME 		30
+%define KB_END 			31
+%define KB_PGUP 		32
+%define KB_PGDN 		33
+%define KB_LEFT 		34
+%define KB_RIGHT 		35
+%define KB_UP 			36
+%define KB_DOWN 		37
+%define KB_NUM_DOT 		38
+%define KB_NUM_ENTER 	39
+%define KB_NUM_PLUS 	40
+%define KB_NUM_MINUS 	41
+%define KB_NUM_MUL 		42
+%define KB_NUM_DIV 		43
+%define KB_NUM_0 		44
+%define KB_NUM_1 		45
+%define KB_NUM_2 		46
+%define KB_NUM_3 		47
+%define KB_NUM_4 		48
+%define KB_NUM_5 		49
+%define KB_NUM_6 		51
+%define KB_NUM_7 		52
+%define KB_NUM_8 		53
+%define KB_NUM_9 		54
+%define KB_BACKSP 		127
+
+%define KB_UP_ARROW		KB_NUM_8
+%define KB_DOWN_ARROW	KB_NUM_2
+%define KB_LEFT_ARROW	KB_NUM_4
+%define KB_RIGHT_ARROW	KB_NUM_6
+%define KB_SPACE		' '

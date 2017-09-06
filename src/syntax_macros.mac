@@ -1,0 +1,318 @@
+%ifndef MACROS_MAC
+%define MACROS_MAC
+
+%define tok_concat(x, y) x %+ y
+
+; proc/endproc
+
+%macro proc 1
+	%push proc
+
+global %1
+%1:
+	push bp
+	mov bp, sp
+
+	%assign %$arg 4
+	%define %$firstarg 4
+	%define %$procname %1
+	%stacksize large
+%endmacro
+
+%macro endproc 0
+	%ifctx proc
+		mov sp, bp
+		pop bp
+		ret
+	__end_%$procname:
+		%pop
+	%else
+		%error "mismatched endproc/proc"
+	%endif
+%endmacro
+
+%macro stack_reserve 1
+	sub sp, %1
+	%assign %$localsize %1
+%endmacro
+
+; multiple push/pop
+
+%macro mpush 1-*
+	%rep %0
+		push %1
+		%rotate 1
+	%endrep
+%endmacro
+
+%macro mpop 1-*
+	%rep %0
+		pop %1
+		%rotate 1
+	%endrep
+%endmacro
+
+%endif
+
+; functions using ax
+
+%macro movax 2-*
+	%rotate -1
+	%ifidn %1,0
+		xor ax, ax
+	%else
+		mov ax, %1
+	%endif
+	%rep %0-1
+		%rotate -1
+		mov %1, ax
+	%endrep
+%endmacro
+
+%macro cmpax 2
+	mov ax, %2
+	cmp %1, ax
+%endmacro
+
+%macro addax 2
+	mov ax, %1
+	add ax, %2
+	mov %1, ax
+%endmacro
+
+; cdecl call
+
+%macro ccall 1-*
+	%define %$func_name %1
+	%rotate -1
+	%assign %$argcount %0-1
+	%rep %0-1
+		push %1
+		%rotate -1
+	%endrep
+	call %$func_name
+	%if %$argcount > 0
+		add sp, %$argcount*2
+	%endif
+%endmacro
+
+; if/else/elseif/endif
+
+%macro if 2-*
+	%push if
+	%assign %$__curr 0
+	%rotate -1
+	%define %$if_cond %-1
+	%rep %0-1
+		%rotate 1
+		%1
+	%endrep
+	j%$if_cond tok_concat(%$if_not, %$__curr)
+%endmacro
+
+%macro elseif 2-*
+	%ifctx if
+		jmp %$if_end
+		tok_concat(%$if_not, %$__curr):
+		%assign %$__curr %$__curr + 1
+
+		%rotate -1
+		; careful, these are overwritten
+		%define %$if_cond %-1
+		%rep %0-1
+			%rotate 1
+			%1
+		%endrep
+		j%$if_cond tok_concat(%$if_not, %$__curr)
+	%else
+		%error "mismatched if/elseif"
+	%endif
+%endmacro
+
+%macro else 0
+	%ifnctx if
+		%error "mismatched if/else"
+	%else
+		jmp %$if_end
+		tok_concat(%$if_not, %$__curr):
+		%assign %$__curr %$__curr + 1
+	%endif
+%endmacro
+
+%macro endif 0
+	%ifctx if
+		tok_concat(%$if_not, %$__curr):
+		%$if_end:
+		%pop
+	%else
+		%error "mismatched if/else/endif"
+	%endif
+%endmacro
+
+%macro do 0
+	%push do
+	%define %$repeat_block
+%$repeat:
+%endmacro
+
+%macro while 2
+	%ifctx do
+		%1
+		%ifndef %$stop_repeat
+			j%+2 %$repeat
+		%endif
+		%pop
+	%else
+		%error "mismatched do/while"
+	%endif
+%endmacro
+
+; for/endfor
+
+%macro forinc 3-4
+	%push forinc
+	%define %$var %1
+	%define %$start %2
+	%define %$end %3
+	%ifempty %4
+		%define %$incr 1
+	%else
+		%define %$incr %4
+	%endif
+	%define %$repeat_block
+
+	movax %$var, %$start
+%$for_start:
+%endmacro
+
+;for {mov word [y], 0}, {cmpax word [y], [yf]}, l, {inc word [y]}
+%macro for 4
+	%push for
+	%define %$for_init %1
+	%define %$for_cond %2
+	%define %$for_testcond %+3
+	%define %$for_iter %4
+
+	%define %$repeat_block
+
+	%$for_init
+%$for_start:
+%endmacro
+
+%macro endfor 0
+	%ifctx forinc
+		%$repeat:
+		%ifidn %$incr,1
+			inc %$var
+		%else
+			mov ax, %$var
+			add ax, %$incr
+			mov %$var, ax
+		%endif
+		%ifndef %$stop_repeat
+			cmpax %$var, %$end
+			jl %$for_start
+		%endif
+	%elifctx for
+		%$repeat:
+		%$for_iter
+		%$for_cond
+		j%$for_testcond %$for_start
+	%else
+		%error "mismatched for/endfor"
+	%endif
+	%pop
+%endmacro
+
+; continue/break
+
+%macro continue 0
+	%ifctx do
+		jmp %$repeat
+	%elifctx forinc
+		jmp %$repeat
+	%elifctx for
+		jmp %$repeat
+	%else
+		; no nice way of doing this; the precompiler is stupid
+		%ifdef %$$repeat_block
+			jmp %$$repeat
+		%elifdef %$$$repeat_block
+			jmp %$$$repeat
+		%elifdef %$$$$repeat_block
+			jmp %$$$$repeat
+		%elifdef %$$$$$repeat_block
+			jmp %$$$$$repeat
+		%elifdef %$$$$$$repeat_block
+			jmp %$$$$$$repeat
+		%elifdef %$$$$$$$repeat_block
+			jmp %$$$$$$$repeat
+		%elifdef %$$$$$$$$repeat_block
+			jmp %$$$$$$$$repeat
+		%elifdef %$$$$$$$$$repeat_block
+			jmp %$$$$$$$$$repeat
+		%elifdef %$$$$$$$$$$$repeat_block
+			jmp %$$$$$$$$$$$repeat
+		%elifdef %$$$$$$$$$$$$repeat_block
+			jmp %$$$$$$$$$$$$repeat
+		%else
+			%error "mismatched do/continue"
+		%endif
+	%endif
+%endmacro
+
+%macro break 0
+	%ifctx do
+		%define %$stop_repeat
+	%elifctx for
+		%define %$stop_repeat
+	%elifctx for
+		%define %$stop_repeat
+	%else
+		; no nice way of doing this; the precompiler is stupid
+		%ifdef %$$repeat_block
+			%define %$$stop_repeat
+		%elifdef %$$$repeat_block
+			%define %$$$stop_repeat
+		%elifdef %$$$$repeat_block
+			%define %$$$$stop_repeat
+		%elifdef %$$$$$repeat_block
+			%define %$$$$$stop_repeat
+		%elifdef %$$$$$$repeat_block
+			%define %$$$$$$stop_repeat
+		%elifdef %$$$$$$$repeat_block
+			%define %$$$$$$$stop_repeat
+		%elifdef %$$$$$$$$repeat_block
+			%define %$$$$$$$$stop_repeat
+		%elifdef %$$$$$$$$$repeat_block
+			%define %$$$$$$$$$stop_repeat
+		%elifdef %$$$$$$$$$$$repeat_block
+			%define %$$$$$$$$$$$stop_repeat
+		%elifdef %$$$$$$$$$$$$repeat_block
+			%define %$$$$$$$$$$$$stop_repeat
+		%else
+			%error "mismatched do/break"
+		%endif
+	%endif
+%endmacro
+
+%define segaddr(x) seg x, x
+
+; %define _token_concat(x, y) x %+ y
+		; %assign found_context 0
+		; %define curr_repeat repeat
+		; %rep 3
+		; 	; try to find the enclosing "do" context
+		; 	%if 1
+		; 		jmp %$top_repeat
+		; 		;%error %$$repeat
+		; 		;%error %[%$top_repeat]
+		; 		;%error %$top_repeat
+		; 		%assign found_context 1
+		; 		;%exitrep
+		; 	%endif
+		; 	; quite a trick here
+		; 	%define curr_repeat $%[curr_repeat]
+		; 	%define %$top_repeat _token_concat(%, %[curr_repeat])
+		; 	;%error %$top_repeat
+		; %endrep

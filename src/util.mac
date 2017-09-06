@@ -1,0 +1,40 @@
+; util.mac
+
+%macro set_isr_cs 4
+%define %$int_no %1
+%define %$isr_seg %2
+%define %$isr_proc %3
+%define %$old_isr_location %4
+	mpush ds, es, bx
+	cli
+
+	mov ax, 35%$int_no
+	int 21h
+	mov [cs:%$old_isr_location], bx
+	mov [cs:%$old_isr_location + 2], es
+
+	mov ax, 25%$int_no
+	mov bx, %$isr_seg
+	mov ds, bx
+	mov dx, %$isr_proc
+	int 21h
+
+	sti
+	mpop bx, es, ds
+%endmacro
+
+%macro restore_isr_cs 2
+%define %$int_no %1
+%define %$old_isr_location %2
+	push ds
+	cli
+
+	mov dx, [cs:%$old_isr_location]
+	mov ax, [cs:%$old_isr_location + 2]
+	mov ds, ax
+	mov ax, 25%$int_no
+	int 21h
+
+	sti
+	pop ds
+%endmacro
